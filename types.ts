@@ -21,6 +21,14 @@ export interface Product {
   is_active?: boolean;
   originalPrice?: number;
   variants?: ProductVariant[];
+  // Rich Media
+  video_url?: string;
+  images_360?: string[];
+  gallery_images?: string[];
+  // SEO
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string[];
 }
 
 export interface CartItem extends Product {

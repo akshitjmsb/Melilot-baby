@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { supabase } from '../supabaseClient';
@@ -15,17 +15,30 @@ const ProductDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
 
+  // Rich Media State
+  const [activeMedia, setActiveMedia] = useState<string>('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | '360'>('image');
+  const [rotationIndex, setRotationIndex] = useState(0); // For 360 view
+
   useEffect(() => {
     if (id) {
       fetchProductAndVariants(id);
     }
   }, [id]);
 
+  useEffect(() => {
+    if (product) {
+      // Simple SEO Title Update
+      document.title = product.seo_title || `${product.name} | Petit Coton`;
+      // Meta description would ideally be handled by a Helmet library, 
+      // but for this PWA demo we assume standard SPA behavior or server-side rendering later.
+    }
+  }, [product]);
+
   const fetchProductAndVariants = async (productId: string) => {
     try {
       setLoading(true);
 
-      // Fetch product
       const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*')
@@ -34,12 +47,11 @@ const ProductDetailScreen: React.FC = () => {
 
       if (productError) throw productError;
 
-      // Fetch variants
       const { data: variantsData, error: variantsError } = await supabase
         .from('product_variants')
         .select('*')
         .eq('product_id', productId)
-        .gt('inventory_count', 0); // Only show in-stock variants (optional logic)
+        .gt('inventory_count', 0);
 
       if (variantsError) throw variantsError;
 
@@ -47,14 +59,18 @@ const ProductDetailScreen: React.FC = () => {
         const mappedProduct: Product = {
           ...productData,
           price: productData.base_price,
-          image: productData.image_url || 'https://placehold.co/400x500?text=No+Image'
+          image: productData.image_url || 'https://placehold.co/400x500?text=No+Image',
+          images_360: productData.images_360 || [],
+          gallery_images: productData.gallery_images || [],
+          video_url: productData.video_url
         };
         setProduct(mappedProduct);
+        setActiveMedia(mappedProduct.image_url || '');
+        setMediaType('image');
       }
 
       if (variantsData) {
         setVariants(variantsData);
-        // Auto-select first available size if any
         if (variantsData.length > 0) {
           setSelectedSize(variantsData[0].size);
         }
@@ -69,36 +85,33 @@ const ProductDetailScreen: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
-
-    // Find selected variant object
     const selectedVariant = variants.find(v => v.size === selectedSize);
-
-    // Calculate final price (base + additional)
     let finalPrice = product.price || 0;
     if (selectedVariant?.additional_price) {
       finalPrice += selectedVariant.additional_price;
     }
 
-    // Pass variant info to cart (assuming addToCart can handle it or we enhance it later)
-    // For now, adhering to simple addToCart interface but we should probably enrich it
-    // The current addToCart signature might need checking, but standard pattern:
     addToCart({
       ...product,
       price: finalPrice,
-      id: selectedVariant ? selectedVariant.id : product.id // Use variant ID if possible for uniqueness? Or keep product ID + size
+      id: selectedVariant ? selectedVariant.id : product.id
     }, selectedSize);
 
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
   };
 
-  // Derived state
   const selectedVariant = variants.find(v => v.size === selectedSize);
   const currentPrice = (product?.price || 0) + (selectedVariant?.additional_price || 0);
 
+  // 360 Interaction Logic
+  const handle360Scrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRotationIndex(Number(e.target.value));
+  };
+
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
@@ -114,130 +127,182 @@ const ProductDetailScreen: React.FC = () => {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden pb-24 bg-bg-light">
-      {/* Header (Overlay) */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-bg-light/80 backdrop-blur-md border-b border-transparent transition-colors duration-200">
+    <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden pb-28 bg-bg-light">
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100/50 transition-all duration-200">
         <div className="flex items-center justify-between px-4 h-14">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex size-10 items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition-all text-text-main"
-          >
+          <button onClick={() => navigate(-1)} className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main">
             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back_ios_new</span>
           </button>
-          <h1 className="text-sm font-semibold tracking-wide uppercase opacity-0 lg:opacity-100 transition-opacity">Shop</h1>
-          <button
-            onClick={() => navigate('/cart')}
-            className="relative flex size-10 items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition-all text-text-main"
-          >
+          <h1 className="text-sm font-bold tracking-wide uppercase opacity-90 truncate max-w-[200px]">{product.name}</h1>
+          <button onClick={() => navigate('/cart')} className="relative flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main">
             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>shopping_bag</span>
-            {itemCount > 0 && (
-              <span className="absolute top-2 right-2 size-2.5 rounded-full bg-primary border border-white"></span>
-            )}
+            {itemCount > 0 && <span className="absolute top-2 right-2 size-2.5 rounded-full bg-primary border-2 border-white"></span>}
           </button>
         </div>
       </div>
 
       <main className="flex-1 w-full pt-14">
-        {/* Carousel */}
-        <div className="relative w-full aspect-[4/5] bg-neutral-100">
-          <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-full w-full">
-            <div className="snap-center shrink-0 w-full h-full relative">
-              <img
-                src={product.image}
-                alt={product.name}
-                className="absolute inset-0 h-full w-full object-cover"
+        {/* Gallery / Media Viewer */}
+        <div className="relative w-full aspect-[4/5] bg-neutral-100 overflow-hidden group">
+
+          {/* Media Content */}
+          <div className="w-full h-full flex items-center justify-center bg-white">
+            {mediaType === 'video' && product.video_url ? (
+              <video
+                src={product.video_url}
+                controls
+                autoPlay
+                muted
+                loop
+                className="w-full h-full object-cover"
               />
-            </div>
-            {/* Placeholder for more images if we had a gallery */}
+            ) : mediaType === '360' && product.images_360 && product.images_360.length > 0 ? (
+              <div className="relative w-full h-full">
+                <img
+                  src={product.images_360[rotationIndex]}
+                  alt="360 View"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-6 left-0 right-0 px-8 flex flex-col items-center gap-2">
+                  <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md">Drag to Rotate</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={product.images_360.length - 1}
+                    value={rotationIndex}
+                    onChange={handle360Scrub}
+                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+              </div>
+            ) : (
+              <img src={activeMedia} alt={product.name} className="w-full h-full object-cover transition-opacity duration-300" />
+            )}
+          </div>
+
+          {/* Media Thumbnails Overlay */}
+          <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto no-scrollbar pb-1 z-10">
+            {/* Main Image */}
+            <button
+              onClick={() => { setActiveMedia(product.image!); setMediaType('image'); }}
+              className={`size-14 shrink-0 rounded-lg overflow-hidden border-2 ${activeMedia === product.image && mediaType === 'image' ? 'border-primary' : 'border-white'} shadow-sm`}
+            >
+              <img src={product.image} className="w-full h-full object-cover" />
+            </button>
+
+            {/* 360 Toggle */}
+            {product.images_360 && product.images_360.length > 0 && (
+              <button
+                onClick={() => { setMediaType('360'); setRotationIndex(0); }}
+                className={`size-14 shrink-0 rounded-lg overflow-hidden border-2 flex items-center justify-center bg-white ${mediaType === '360' ? 'border-primary' : 'border-white'} shadow-sm`}
+              >
+                <span className="material-symbols-outlined text-gray-700">360</span>
+              </button>
+            )}
+
+            {/* Video Toggle */}
+            {product.video_url && (
+              <button
+                onClick={() => { setActiveMedia(''); setMediaType('video'); }}
+                className={`size-14 shrink-0 rounded-lg overflow-hidden border-2 flex items-center justify-center bg-white ${mediaType === 'video' ? 'border-primary' : 'border-white'} shadow-sm`}
+              >
+                <span className="material-symbols-outlined text-gray-700">play_circle</span>
+              </button>
+            )}
+
+            {/* Gallery Images */}
+            {product.gallery_images?.map((img, idx) => (
+              <button
+                key={idx}
+                onClick={() => { setActiveMedia(img); setMediaType('image'); }}
+                className={`size-14 shrink-0 rounded-lg overflow-hidden border-2 ${activeMedia === img && mediaType === 'image' ? 'border-primary' : 'border-white'} shadow-sm`}
+              >
+                <img src={img} className="w-full h-full object-cover" />
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Product Info */}
+        {/* Product Details */}
         <div className="px-5 pt-6 pb-2">
+          {/* Title & Price */}
           <div className="flex flex-col gap-2 mb-6">
-            <div className="flex justify-between items-start gap-4">
-              <h1 className="text-2xl font-bold leading-tight tracking-tight text-text-main">{product.name}</h1>
-              <span className="text-xl font-bold text-text-main whitespace-nowrap">${currentPrice.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-neutral-600">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '16px' }}>eco</span>
-              <p className="font-medium">100% Organic Cotton</p>
-              <span className="w-1 h-1 rounded-full bg-neutral-300 mx-1"></span>
-              <p>Montreal, CA</p>
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-text-main">{product.name}</h1>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-text-main">${currentPrice.toFixed(2)}</span>
+              {product.originalPrice && (
+                <span className="text-lg text-gray-400 line-through decoration-1">${product.originalPrice.toFixed(2)}</span>
+              )}
             </div>
           </div>
 
           {/* Size Selector */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-3">
-              <label className="text-sm font-semibold text-text-main">
-                Select Size {variants.length === 0 && <span className="text-red-500 font-normal">(No variants available)</span>}
-              </label>
+              <label className="text-sm font-semibold text-text-main flex items-center gap-2">Select Size</label>
               <button className="text-xs font-medium text-neutral-500 underline decoration-neutral-300">Size Guide</button>
             </div>
-
             {variants.length > 0 ? (
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+              <div className="grid grid-cols-4 gap-2">
                 {variants.map((variant) => (
                   <button
                     key={variant.id}
                     onClick={() => setSelectedSize(variant.size)}
-                    className={`flex-1 min-w-[72px] h-12 rounded-lg text-sm transition-all
+                    className={`h-12 rounded-xl text-sm transition-all flex items-center justify-center
                             ${selectedSize === variant.size
-                        ? 'bg-primary border border-primary text-[#112114] font-bold shadow-sm ring-2 ring-primary/20'
-                        : 'border border-neutral-200 bg-white text-text-main font-medium hover:border-primary/50'}
-                        `}
+                        ? 'bg-primary text-[#112114] font-bold ring-2 ring-primary/20 shadow-sm'
+                        : 'bg-white border border-gray-100 text-gray-600 font-medium hover:bg-gray-50'}`}
                   >
                     {variant.size}
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">Standard size</p>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 italic">One size available</div>
             )}
-
           </div>
 
-          <div className="mb-8">
-            <p className="text-base font-normal leading-relaxed text-neutral-600">
-              {product.description || 'No description available.'}
+          {/* Description */}
+          <div className="mb-8 p-4 bg-white rounded-2xl border border-gray-100">
+            <h3 className="text-sm font-bold text-text-main mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">description</span>
+              Description
+            </h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              {product.description || 'No description available for this product.'}
             </p>
           </div>
 
-          {/* Accordions */}
-          <div className="flex flex-col border-t border-neutral-100">
-            {[
-              { icon: 'dry_cleaning', label: 'Fabric & Care' },
-              { icon: 'volunteer_activism', label: 'Our Organic Promise' },
-              { icon: 'local_shipping', label: 'Shipping & Returns' }
-            ].map((item, idx) => (
-              <React.Fragment key={idx}>
-                <button className="group flex w-full items-center justify-between py-4 text-left active:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-8 items-center justify-center rounded-full bg-neutral-50 text-text-main">
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{item.icon}</span>
-                    </div>
-                    <span className="text-base font-semibold text-text-main">{item.label}</span>
-                  </div>
-                  <span className="material-symbols-outlined text-neutral-400 group-hover:text-text-main transition-colors">expand_more</span>
-                </button>
-                <div className="w-full h-px bg-neutral-100"></div>
-              </React.Fragment>
-            ))}
+          {/* Features Accordion (Static for Demo) */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-gray-400">local_shipping</span>
+                <span className="text-sm font-medium text-text-main">Free Shipping over $100</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-gray-400">verified</span>
+                <span className="text-sm font-medium text-text-main">100% Organic Certified</span>
+              </div>
+            </div>
           </div>
         </div>
       </main>
 
       {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-neutral-100 p-4 safe-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 safe-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <button
           onClick={handleAddToCart}
           disabled={variants.length > 0 && !selectedSize}
-          className={`relative w-full overflow-hidden rounded-xl h-14 group transition-all active:scale-[0.99] shadow-lg shadow-primary/30 flex items-center justify-between px-6 ${isAdded ? 'bg-green-500' : 'bg-primary'} disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`relative w-full overflow-hidden rounded-full h-14 group transition-all active:scale-[0.98] shadow-lg flex items-center justify-between px-6 
+            ${isAdded ? 'bg-[#112114] text-white' : 'bg-primary text-[#112114] hover:bg-primary-dark'} 
+            disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          <span className="text-sm font-bold text-[#112114]">{isAdded ? 'Added to Bag!' : '1 Item'}</span>
-          <span className="text-base font-bold text-[#112114] uppercase tracking-wide">{isAdded ? 'Continue Shopping' : 'Add to Cart'}</span>
-          <span className="text-sm font-bold text-[#112114]">${currentPrice.toFixed(2)}</span>
+          <span className="text-sm font-bold">{isAdded ? 'Added!' : 'Add to Cart'}</span>
+          <span className="text-sm font-bold">${currentPrice.toFixed(2)}</span>
         </button>
       </div>
     </div>

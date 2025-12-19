@@ -1,6 +1,6 @@
 -- Create product_variants table
 CREATE TABLE IF NOT EXISTS product_variants (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   size TEXT NOT NULL,
   color TEXT NOT NULL,

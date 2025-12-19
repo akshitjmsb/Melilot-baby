@@ -1,6 +1,6 @@
 -- Create orders table
 create table orders (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   user_id uuid references auth.users(id), -- Nullable for guest checkout
   status text not null default 'pending', -- pending, paid, shipped, cancelled
@@ -12,7 +12,7 @@ create table orders (
 
 -- Create order items table
 create table order_items (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   order_id uuid references orders(id) on delete cascade not null,
   product_id uuid references products(id) not null,
   variant_id uuid references product_variants(id), -- Optional if product has no variants
