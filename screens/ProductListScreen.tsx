@@ -148,6 +148,22 @@ const ProductListScreen: React.FC = () => {
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            <div className="size-20 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+              <span className="material-symbols-outlined text-4xl">inventory_2</span>
+            </div>
+            <h3 className="text-lg font-bold text-text-main mb-2">No Products Found</h3>
+            <p className="text-gray-500 text-sm max-w-[250px] leading-relaxed">
+              We're currently restocking our shelves differently. Please check back later for new arrivals!
+            </p>
+            <button
+              onClick={() => navigate('/home')}
+              className="mt-6 px-6 py-2.5 rounded-full border border-gray-200 bg-white text-text-main font-bold text-sm hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
+            >
+              Back to Collections
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-4 gap-y-8">
             {products.map((product) => (

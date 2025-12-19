@@ -1,11 +1,12 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import WelcomeScreen from './screens/WelcomeScreen';
 import HomeScreen from './screens/HomeScreen';
 import ProductListScreen from './screens/ProductListScreen';
 import ProductDetailScreen from './screens/ProductDetailScreen';
 import CartScreen from './screens/CartScreen';
 import CheckoutScreen from './screens/CheckoutScreen';
+import OrderConfirmationScreen from './screens/OrderConfirmationScreen';
 import ReloadPrompt from './components/ReloadPrompt';
 import { CartProvider } from './context/CartContext';
 
@@ -21,6 +22,7 @@ const App: React.FC = () => {
             <Route path="/product/:id" element={<ProductDetailScreen />} />
             <Route path="/cart" element={<CartScreen />} />
             <Route path="/checkout" element={<CheckoutScreen />} />
+            <Route path="/order-confirmation/:id" element={<OrderConfirmationScreen />} />
             {/* Fallback routes */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

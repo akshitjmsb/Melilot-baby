@@ -1,19 +1,85 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useCart } from '../context/CartContext';
+import { supabase } from '../supabaseClient';
+import { calculateTax, PROVINCES } from '../utils/tax';
+
+const shippingSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  address: z.string().min(1, 'Address is required'),
+  city: z.string().min(1, 'City is required'),
+  province: z.string().min(2, 'Province is required'),
+  postalCode: z.string().min(5, 'Valid postal code is required'),
+  email: z.string().email('Invalid email address')
+});
+
+type ShippingFormValues = z.infer<typeof shippingSchema>;
 
 const CheckoutScreen: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, cartTotal, clearCart } = useCart();
   const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handlePlaceOrder = () => {
-    // Simulate API call
-    setTimeout(() => {
-      alert('Order placed successfully! Thank you for shopping with Melilot Baby.');
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<ShippingFormValues>({
+    resolver: zodResolver(shippingSchema),
+    defaultValues: {
+      province: 'ON'
+    }
+  });
+
+  const selectedProvince = watch('province');
+  const { taxAmount, rate } = calculateTax(cartTotal, selectedProvince);
+  const finalTotal = cartTotal + taxAmount;
+
+  const onSubmit = async (data: ShippingFormValues) => {
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const orderData = {
+        user_id: user?.id || null,
+        status: 'pending',
+        total_amount: finalTotal,
+        shipping_address: data,
+        contact_email: data.email,
+        stripe_payment_id: 'mock_payment_id' // Mocking payment for MVP
+      };
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItems = cartItems.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        variant_id: item.variantId,
+        quantity: item.quantity,
+        price_at_time: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
       clearCart();
-      navigate('/home');
-    }, 500);
+      navigate(`/order-confirmation/${order.id}`);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert('Failed to place order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -26,126 +92,66 @@ const CheckoutScreen: React.FC = () => {
           </button>
           <h2 className="text-text-main text-lg font-bold leading-tight tracking-tight flex-1 text-center pr-10">Secure Checkout</h2>
         </div>
-
-        {/* Progress Steps */}
-        <div className="flex w-full flex-row items-center justify-center gap-2 pb-4">
-          <div className="flex flex-col items-center gap-1">
-            <div className="h-2 w-2 rounded-full bg-slate-300"></div>
-          </div>
-          <div className="h-[2px] w-8 bg-slate-300"></div>
-          <div className="flex flex-col items-center gap-1">
-            <div className="h-2.5 w-2.5 ring-4 ring-primary/30 rounded-full bg-primary"></div>
-          </div>
-          <div className="h-[2px] w-8 bg-slate-300"></div>
-          <div className="flex flex-col items-center gap-1">
-            <div className="h-2 w-2 rounded-full bg-slate-300"></div>
-          </div>
-        </div>
       </header>
 
       <main className="flex-1 px-4 py-6 space-y-6">
-        {/* Shipping Section */}
-        <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-slate-700">
-                <span className="material-symbols-outlined text-[20px]">local_shipping</span>
-              </span>
-              <h2 className="text-lg font-bold text-text-main">Shipping</h2>
-            </div>
-            <button className="text-slate-600 hover:text-primary transition-colors text-sm font-semibold">Edit</button>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex gap-4">
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">First Name</label>
-                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="Jane" type="text" />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Last Name</label>
-                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="Doe" type="text" />
+        <form onSubmit={handleSubmit(onSubmit)} id="checkout-form">
+          {/* Shipping Section */}
+          <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-slate-700">
+                  <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                </span>
+                <h2 className="text-lg font-bold text-text-main">Shipping</h2>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</label>
-              <div className="relative">
-                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="123 Maple Street" type="text" />
-                <span className="material-symbols-outlined absolute right-3 top-3 text-slate-400 text-[20px]">home</span>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="flex-[2] space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">City</label>
-                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="Toronto" type="text" />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prov</label>
-                <div className="relative">
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none">
-                    <option>ON</option>
-                    <option>QC</option>
-                    <option>BC</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-2 top-3 pointer-events-none text-slate-400 text-[18px]">expand_more</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Payment Section */}
-        <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-slate-700">
-                <span className="material-symbols-outlined text-[20px]">credit_card</span>
-              </span>
-              <h2 className="text-lg font-bold text-text-main">Payment</h2>
-            </div>
-            <div className="flex gap-2">
-              <span className="material-symbols-outlined text-slate-400 text-[20px]">lock</span>
-              <span className="material-symbols-outlined text-slate-400 text-[20px]">verified_user</span>
-            </div>
-          </div>
-          <div className="p-5 space-y-5">
-            <button className="w-full bg-black text-white h-12 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-900 transition-colors">
-              <span className="font-medium text-lg tracking-tight"> Pay</span>
-            </button>
-            <div className="relative flex items-center gap-3">
-              <div className="h-px bg-slate-200 flex-1"></div>
-              <span className="text-xs text-slate-400 uppercase font-medium">Or pay with card</span>
-              <div className="h-px bg-slate-200 flex-1"></div>
-            </div>
-
-            {/* Card Form */}
-            <div className="space-y-4">
+            <div className="p-5 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Card Number</label>
-                <div className="relative">
-                  <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="0000 0000 0000 0000" type="text" />
-                  <span className="material-symbols-outlined absolute right-3 top-3 text-slate-400 text-[20px]">payment</span>
-                </div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</label>
+                <input {...register('email')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="email@example.com" type="email" />
+                {errors.email && <span className="text-red-500 text-xs">{errors.email.message}</span>}
               </div>
               <div className="flex gap-4">
                 <div className="flex-1 space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Expiry</label>
-                  <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="MM/YY" type="text" />
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">First Name</label>
+                  <input {...register('firstName')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="Jane" />
+                  {errors.firstName && <span className="text-red-500 text-xs">{errors.firstName.message}</span>}
                 </div>
                 <div className="flex-1 space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">CVC</label>
-                  <div className="relative">
-                    <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400" placeholder="123" type="text" />
-                    <span className="material-symbols-outlined absolute right-3 top-3 text-slate-400 text-[18px]">help</span>
-                  </div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Last Name</label>
+                  <input {...register('lastName')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="Doe" />
+                  {errors.lastName && <span className="text-red-500 text-xs">{errors.lastName.message}</span>}
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</label>
+                <input {...register('address')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="123 Maple Street" />
+                {errors.address && <span className="text-red-500 text-xs">{errors.address.message}</span>}
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-[2] space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">City</label>
+                  <input {...register('city')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="Toronto" />
+                  {errors.city && <span className="text-red-500 text-xs">{errors.city.message}</span>}
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prov</label>
+                  <select {...register('province')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-sm outline-none">
+                    {PROVINCES.map(p => (
+                      <option key={p.code} value={p.code}>{p.code}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Postal Code</label>
+                <input {...register('postalCode')} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm outline-none" placeholder="M5V 2H1" />
+                {errors.postalCode && <span className="text-red-500 text-xs">{errors.postalCode.message}</span>}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input className="rounded border-slate-300 text-primary focus:ring-primary" type="checkbox" defaultChecked />
-              <label className="text-sm text-slate-600">Save this card for future purchases</label>
-            </div>
-          </div>
-        </section>
+          </section>
+        </form>
 
         {/* Order Summary */}
         <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -190,17 +196,13 @@ const CheckoutScreen: React.FC = () => {
                   <span className="font-medium text-text-main">Free</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">HST (13%)</span>
-                  <span className="font-medium text-text-main">${(cartTotal * 0.13).toFixed(2)}</span>
+                  <span className="text-slate-600">Tax ({selectedProvince} @ {(rate * 100).toFixed(1)}%)</span>
+                  <span className="font-medium text-text-main">${taxAmount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
           )}
         </section>
-
-        <p className="text-center text-xs text-slate-400 px-8 leading-relaxed">
-          By placing your order, you agree to our <a className="underline hover:text-primary" href="#">Terms of Service</a> and <a className="underline hover:text-primary" href="#">Privacy Policy</a>.
-        </p>
       </main>
 
       {/* Footer / Place Order */}
@@ -208,14 +210,20 @@ const CheckoutScreen: React.FC = () => {
         <div className="max-w-md mx-auto w-full flex items-center justify-between gap-4">
           <div className="flex flex-col">
             <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total CAD</span>
-            <span className="text-2xl font-bold text-text-main tracking-tight">${(cartTotal * 1.13).toFixed(2)}</span>
+            <span className="text-2xl font-bold text-text-main tracking-tight">${finalTotal.toFixed(2)}</span>
           </div>
           <button
-            onClick={handlePlaceOrder}
-            className="flex-1 h-14 bg-primary text-[#111712] rounded-full font-bold text-lg hover:bg-primary-dark active:scale-[0.98] transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2"
+            type="submit"
+            form="checkout-form"
+            disabled={isSubmitting || cartItems.length === 0}
+            className="flex-1 h-14 bg-primary text-[#111712] rounded-full font-bold text-lg hover:bg-primary-dark active:scale-[0.98] transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <span>Place Order</span>
-            <span className="material-symbols-outlined text-[20px] font-bold">arrow_forward</span>
+            {isSubmitting ? 'Processing...' : (
+              <>
+                <span>Place Order</span>
+                <span className="material-symbols-outlined text-[20px] font-bold">arrow_forward</span>
+              </>
+            )}
           </button>
         </div>
       </footer>
