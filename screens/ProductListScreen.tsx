@@ -162,7 +162,13 @@ const ProductListScreen: React.FC = () => {
         <h2 className="text-lg font-bold leading-tight tracking-[-0.01em] text-text-main flex-1 text-center">
           {currentCategory || 'Shop All'}
         </h2>
-        <div className="flex items-center justify-end w-10 relative">
+        <div className="flex items-center justify-end w-20 relative gap-1">
+          <button
+            onClick={() => navigate('/search')}
+            className="flex items-center justify-center p-2 rounded-full hover:bg-gray-50 active:scale-95 transition-all text-text-main"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>search</span>
+          </button>
           <button
             onClick={() => navigate('/cart')}
             className="flex items-center justify-center text-text-main hover:text-primary transition-colors"
@@ -178,8 +184,8 @@ const ProductListScreen: React.FC = () => {
           <button
             onClick={() => setIsFilterOpen(true)}
             className={`flex h-9 shrink-0 items-center justify-center gap-x-1.5 rounded-full border transition-all active:scale-95 ${filters.sizes.length > 0 || filters.minPrice > 0 || filters.maxPrice < 200
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-text-main border-gray-200'
+              ? 'bg-gray-900 text-white border-gray-900'
+              : 'bg-white text-text-main border-gray-200'
               }`}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>tune</span>
