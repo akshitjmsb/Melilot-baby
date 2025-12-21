@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => {
           short_name: 'PetitCoton',
           description: 'Premium Baby Clothing Store',
           theme_color: '#ffffff',
+          background_color: '#ffffff',
+          display: 'standalone',
+          start_url: '/',
           icons: [
             {
               src: 'pwa-192x192.png',
