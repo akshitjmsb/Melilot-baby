@@ -6,17 +6,14 @@ import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-// For seeding we might need SERVICE_ROLE_KEY if RLS policies block anon inserts.
-// But usually for local/dev we might use anon if policies allow, or just assume we have access.
-// Let's try anon key first, assuming we have an "insert" policy or are admin.
-// Actually, for scripts, best practice is SERVICE ROLE if available, but users usually don't put it in .env.local for frontend.
-// I'll stick to what I have. If it fails due to RLS, I might need the user to relax RLS or provide service key.
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase credentials in .env.local');
+    console.error('Missing Supabase credentials. Need VITE_SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY) in .env.local');
     process.exit(1);
 }
+
+console.log(`Using key type: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE (Admin)' : 'ANON (Public)'}`);
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
