@@ -59,7 +59,7 @@ const HomeScreen: React.FC = () => {
                 if (tab.val === 'Gifts') {
                   params.set('category', 'Gift'); // Assuming 'Gift' category exists
                 } else {
-                  params.set('size', tab.val);
+                  params.set('sizes', tab.val);
                 }
                 navigate(`/products?${params.toString()}`);
               }}
