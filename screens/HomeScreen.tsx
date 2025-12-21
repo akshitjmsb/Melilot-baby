@@ -45,10 +45,28 @@ const HomeScreen: React.FC = () => {
       {/* Tabs */}
       <div className="w-full bg-bg-light pt-2">
         <div className="flex gap-3 p-3 overflow-x-auto no-scrollbar">
-          {['Newborn', '0-3 Months', '3-6 Months', '6-12 Months', 'Gift Sets'].map((tab) => (
-            <div key={tab} className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-[#F0F9FF] px-5 cursor-pointer border border-transparent hover:border-primary/50 transition-colors active:scale-95">
-              <p className="text-text-main text-sm font-medium leading-normal whitespace-nowrap">{tab}</p>
-            </div>
+          {[
+            { label: 'Newborn', val: 'NB' },
+            { label: '0-3 Months', val: '0-3M' },
+            { label: '3-6 Months', val: '3-6M' },
+            { label: '6-12 Months', val: '6-12M' },
+            { label: 'Gift Sets', val: 'Gifts' }
+          ].map((tab) => (
+            <button
+              key={tab.label}
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (tab.val === 'Gifts') {
+                  params.set('category', 'Gift'); // Assuming 'Gift' category exists
+                } else {
+                  params.set('size', tab.val);
+                }
+                navigate(`/products?${params.toString()}`);
+              }}
+              className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-[#F0F9FF] px-5 cursor-pointer border border-transparent hover:border-primary/50 transition-colors active:scale-95"
+            >
+              <p className="text-text-main text-sm font-medium leading-normal whitespace-nowrap">{tab.label}</p>
+            </button>
           ))}
         </div>
       </div>

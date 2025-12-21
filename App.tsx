@@ -17,6 +17,7 @@ import { AuthProvider } from './context/AuthContext';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchScreen from './screens/SearchScreen';
+import AboutScreen from './screens/AboutScreen';
 
 const App: React.FC = () => {
   return (
@@ -46,6 +47,7 @@ const App: React.FC = () => {
               />
               <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
               <Route path="/search" element={<SearchScreen />} />
+              <Route path="/about" element={<AboutScreen />} />
 
               {/* Fallback routes */}
               <Route path="*" element={<Navigate to="/" replace />} />
