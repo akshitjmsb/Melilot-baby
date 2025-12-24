@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NavigationDrawer from '../components/NavigationDrawer';
 
 const WelcomeScreen: React.FC = () => {
   const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-bg-light">
@@ -12,7 +14,10 @@ const WelcomeScreen: React.FC = () => {
           <span className="material-symbols-outlined text-primary" style={{ fontSize: '28px' }}>eco</span>
           <span className="text-xl font-bold tracking-tight text-text-main">Petit Coton</span>
         </div>
-        <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+        <button 
+          onClick={() => setIsMenuOpen(true)}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+        >
           <span className="material-symbols-outlined text-gray-600">menu</span>
         </button>
       </header>
@@ -85,6 +90,9 @@ const WelcomeScreen: React.FC = () => {
         </div>
       </div>
       <div className="h-6 w-full"></div>
+      
+      {/* Navigation Drawer */}
+      <NavigationDrawer isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
     </div>
   );
 };

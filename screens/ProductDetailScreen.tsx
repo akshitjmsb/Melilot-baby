@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useSavedItems } from '../context/SavedItemsContext';
 import { supabase } from '../supabaseClient';
 import { Product, ProductVariant } from '../types';
 
@@ -8,12 +9,15 @@ const ProductDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { addToCart, itemCount } = useCart();
+  const { addToSaved, removeFromSaved, isSaved } = useSavedItems();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
   // Rich Media State
   const [activeMedia, setActiveMedia] = useState<string>('');
@@ -76,6 +80,24 @@ const ProductDetailScreen: React.FC = () => {
         }
       }
 
+      // Fetch related products (same category, excluding current product)
+      if (productData) {
+        const { data: relatedData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', productData.category)
+          .neq('id', productId)
+          .limit(4);
+
+        if (relatedData) {
+          setRelatedProducts(relatedData.map(item => ({
+            ...item,
+            price: item.base_price,
+            image: item.image_url || 'https://placehold.co/400x500?text=No+Image',
+          })));
+        }
+      }
+
     } catch (error) {
       console.error('Error fetching details:', error);
     } finally {
@@ -91,14 +113,29 @@ const ProductDetailScreen: React.FC = () => {
       finalPrice += selectedVariant.additional_price;
     }
 
-    addToCart({
-      ...product,
-      price: finalPrice,
-      id: selectedVariant ? selectedVariant.id : product.id
-    }, selectedSize);
+    // Add the item multiple times based on quantity
+    for (let i = 0; i < quantity; i++) {
+      addToCart({
+        ...product,
+        price: finalPrice,
+        id: selectedVariant ? selectedVariant.id : product.id
+      }, selectedSize);
+    }
 
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
+    setQuantity(1); // Reset quantity after adding
+  };
+
+  const handleQuantityChange = (delta: number) => {
+    const selectedVariant = variants.find(v => v.size === selectedSize);
+    const maxStock = selectedVariant?.inventory_count || 100;
+    setQuantity(prev => {
+      const newQuantity = prev + delta;
+      if (newQuantity < 1) return 1;
+      if (newQuantity > maxStock) return prev;
+      return newQuantity;
+    });
   };
 
   const selectedVariant = variants.find(v => v.size === selectedSize);
@@ -131,14 +168,45 @@ const ProductDetailScreen: React.FC = () => {
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100/50 transition-all duration-200">
         <div className="flex items-center justify-between px-4 h-14">
-          <button onClick={() => navigate(-1)} className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main">
+          <button 
+            onClick={() => navigate(-1)} 
+            aria-label="Go back"
+            className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back_ios_new</span>
           </button>
           <h1 className="text-sm font-bold tracking-wide uppercase opacity-90 truncate max-w-[200px]">{product.name}</h1>
-          <button onClick={() => navigate('/cart')} className="relative flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main">
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>shopping_bag</span>
-            {itemCount > 0 && <span className="absolute top-2 right-2 size-2.5 rounded-full bg-primary border-2 border-white"></span>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (product) {
+                  if (isSaved(product.id)) {
+                    removeFromSaved(product.id);
+                  } else {
+                    addToSaved(product);
+                  }
+                }
+              }}
+              aria-label={product && isSaved(product.id) ? `Remove ${product.name} from saved items` : `Save ${product.name} to wishlist`}
+              className={`flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                product && isSaved(product.id) ? 'text-red-500' : 'text-text-main'
+              }`}
+            >
+              <span className={`material-symbols-outlined ${product && isSaved(product.id) ? 'filled-icon' : ''}`} style={{ fontSize: '24px' }}>favorite</span>
+            </button>
+            <button 
+              onClick={() => navigate('/cart')} 
+              aria-label={`Shopping cart${itemCount > 0 ? ` with ${itemCount} item${itemCount > 1 ? 's' : ''}` : ''}`}
+              className="relative flex size-10 items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>shopping_bag</span>
+              {itemCount > 0 && (
+              <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-text-main text-[10px] font-bold">
+                {itemCount > 99 ? '99+' : itemCount}
+              </span>
+            )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -248,7 +316,11 @@ const ProductDetailScreen: React.FC = () => {
                 {variants.map((variant) => (
                   <button
                     key={variant.id}
-                    onClick={() => setSelectedSize(variant.size)}
+                    onClick={() => {
+                      setSelectedSize(variant.size);
+                      // Reset quantity when size changes and update max based on new size
+                      setQuantity(1);
+                    }}
                     className={`h-12 rounded-xl text-sm transition-all flex items-center justify-center
                             ${selectedSize === variant.size
                         ? 'bg-primary text-[#112114] font-bold ring-2 ring-primary/20 shadow-sm'
@@ -261,6 +333,35 @@ const ProductDetailScreen: React.FC = () => {
             ) : (
               <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 italic">One size available</div>
             )}
+          </div>
+
+          {/* Quantity Selector */}
+          <div className="mb-8">
+            <label className="text-sm font-semibold text-text-main flex items-center gap-2 mb-3">Quantity</label>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1 border border-gray-100">
+                <button
+                  onClick={() => handleQuantityChange(-1)}
+                  disabled={quantity <= 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Decrease quantity"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>remove</span>
+                </button>
+                <span className="text-sm font-semibold w-8 text-center text-text-main">{quantity}</span>
+                <button
+                  onClick={() => handleQuantityChange(1)}
+                  disabled={quantity >= (variants.find(v => v.size === selectedSize)?.inventory_count || 100)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-primary bg-white shadow-sm hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Increase quantity"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                </button>
+              </div>
+              <span className="text-xs text-gray-500">
+                {variants.find(v => v.size === selectedSize)?.inventory_count || 'Many'} available
+              </span>
+            </div>
           </div>
 
           {/* Description */}
@@ -290,6 +391,37 @@ const ProductDetailScreen: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Related Products */}
+        {relatedProducts.length > 0 && (
+          <div className="px-5 pt-8 pb-4">
+            <h2 className="text-xl font-bold text-text-main mb-4">You might also like</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {relatedProducts.map((relatedProduct) => (
+                <div
+                  key={relatedProduct.id}
+                  onClick={() => navigate(`/product/${relatedProduct.id}`)}
+                  className="group flex flex-col gap-2 cursor-pointer active:scale-[0.98] transition-transform"
+                >
+                  <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gray-100">
+                    <img
+                      src={relatedProduct.image || relatedProduct.image_url || 'https://placehold.co/400x500?text=No+Image'}
+                      alt={relatedProduct.name}
+                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <h3 className="text-sm font-semibold text-text-main line-clamp-1">{relatedProduct.name}</h3>
+                    <p className="text-xs text-gray-500 line-clamp-1">{relatedProduct.category}</p>
+                    <p className="text-sm font-bold text-text-main mt-1">
+                      ${(relatedProduct.price || relatedProduct.base_price || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Sticky Bottom Bar */}
@@ -301,8 +433,8 @@ const ProductDetailScreen: React.FC = () => {
             ${isAdded ? 'bg-[#112114] text-white' : 'bg-primary text-[#112114] hover:bg-primary-dark'} 
             disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          <span className="text-sm font-bold">{isAdded ? 'Added!' : 'Add to Cart'}</span>
-          <span className="text-sm font-bold">${currentPrice.toFixed(2)}</span>
+          <span className="text-sm font-bold">{isAdded ? 'Added!' : `Add ${quantity > 1 ? `${quantity} × ` : ''}to Cart`}</span>
+          <span className="text-sm font-bold">${(currentPrice * quantity).toFixed(2)}</span>
         </button>
       </div>
     </div>

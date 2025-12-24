@@ -4,10 +4,14 @@ import BottomNav from '../components/BottomNav';
 import { Product } from '../types';
 import { supabase } from '../supabaseClient';
 import FilterDrawer, { FilterState } from '../components/FilterDrawer';
+import { useSavedItems } from '../context/SavedItemsContext';
+import { useCart } from '../context/CartContext';
 
 const ProductListScreen: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { addToSaved, removeFromSaved, isSaved } = useSavedItems();
+  const { addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -251,14 +255,36 @@ const ProductListScreen: React.FC = () => {
                     {/* Show badges if relevant */}
                   </div>
                   <button
-                    className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/90 backdrop-blur-sm transition-transform active:scale-90 shadow-sm hover:bg-white"
-                    onClick={(e) => { e.stopPropagation(); }}
+                    aria-label={isSaved(product.id) ? `Remove ${product.name} from saved items` : `Save ${product.name} to wishlist`}
+                    className={`absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/90 backdrop-blur-sm transition-transform active:scale-90 shadow-sm hover:bg-white focus:outline-none focus:ring-2 focus:ring-primary ${
+                      isSaved(product.id) ? 'text-red-500' : 'text-gray-600'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isSaved(product.id)) {
+                        removeFromSaved(product.id);
+                      } else {
+                        addToSaved(product);
+                      }
+                    }}
                   >
-                    <span className="material-symbols-outlined text-gray-600 filled-icon" style={{ fontSize: '18px' }}>favorite</span>
+                    <span className={`material-symbols-outlined ${isSaved(product.id) ? 'filled-icon' : ''}`} style={{ fontSize: '18px' }}>favorite</span>
                   </button>
                   <button
-                    className="absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-soft transition-all active:scale-90 hover:bg-primary-dark hover:shadow-lg"
-                    onClick={(e) => { e.stopPropagation(); navigate('/cart'); }}
+                    aria-label={`Add ${product.name} to cart`}
+                    className="absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-soft transition-all active:scale-90 hover:bg-primary-dark hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Get first available size from variants, or use a default
+                      const variants = (product as any).variants || [];
+                      if (variants.length > 0) {
+                        const firstVariant = variants[0];
+                        addToCart(product, firstVariant.size);
+                      } else {
+                        // If no variants, navigate to product detail to select size
+                        navigate(`/product/${product.id}`);
+                      }
+                    }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>add</span>
                   </button>

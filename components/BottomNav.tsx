@@ -24,7 +24,9 @@ const BottomNav: React.FC = () => {
         <button
           key={item.label}
           onClick={() => navigate(item.path)}
-          className={`group flex flex-1 flex-col items-center gap-1.5 transition-colors ${
+          aria-label={`Navigate to ${item.label}`}
+          aria-current={isActive(item.path) ? 'page' : undefined}
+          className={`group flex flex-1 flex-col items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg p-1 ${
             isActive(item.path) ? 'text-text-main' : 'text-gray-400 hover:text-gray-600'
           }`}
         >

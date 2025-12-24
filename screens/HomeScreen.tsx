@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import { Category } from '../types';
 import NavigationDrawer from '../components/NavigationDrawer';
+import { useCart } from '../context/CartContext';
 
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { itemCount } = useCart();
 
   const categories: Category[] = [
     { id: '1', name: 'Rompers', count: '12 items', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD2OEY8-CKcxUQus87bFyimNTyJochCwOMOGJDuWKMK575xBSt50RfRkpQqx-2DKW_1i57o_fdhnkOCDnj5BiZGCUd1aWD09Q8QcoJNoX0ctPYJ9Jw8h_TepQe0QXGU02xjAra__qOyZCab3-n1z2K7mgpfkfolgOZTkwap6lRTQCKz93aotHnMujrpDLD8CQqmRgVGtIoO0O0_d4_7aG5oOuYUTsH5tymdW3semnH-Lc0_8IGkf4uUI4waz4VFkOFylbB77K6_IQ' },
@@ -19,25 +21,33 @@ const HomeScreen: React.FC = () => {
     <div className="relative flex min-h-screen w-full flex-col bg-bg-light pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 flex items-center bg-bg-light/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-100">
-        <div
+        <button
           onClick={() => setIsMenuOpen(true)}
-          className="flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+          aria-label="Open navigation menu"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
           <span className="material-symbols-outlined text-text-main">menu</span>
-        </div>
+        </button>
         <h2 className="text-text-main text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Melilot Baby</h2>
         <div className="flex items-center gap-1">
           <button
             onClick={() => navigate('/search')}
-            className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer text-text-main"
+            aria-label="Search products"
+            className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <span className="material-symbols-outlined shrink-0" style={{ fontSize: '24px' }}>search</span>
           </button>
           <button
             onClick={() => navigate('/cart')}
-            className="flex size-12 cursor-pointer items-center justify-center overflow-hidden rounded-full hover:bg-gray-100 transition-colors"
+            aria-label={`Shopping cart${itemCount > 0 ? ` with ${itemCount} item${itemCount > 1 ? 's' : ''}` : ''}`}
+            className="relative flex size-12 cursor-pointer items-center justify-center overflow-hidden rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <span className="material-symbols-outlined text-text-main">shopping_bag</span>
+            {itemCount > 0 && (
+              <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-text-main text-[10px] font-bold">
+                {itemCount > 99 ? '99+' : itemCount}
+              </span>
+            )}
           </button>
         </div>
       </header>

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '../supabaseClient';
+import { useToast } from '../context/ToastContext';
 
 const signUpSchema = z.object({
     fullName: z.string().min(2, 'Full name is required'),
@@ -15,6 +16,7 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 const SignUpScreen: React.FC = () => {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -42,13 +44,16 @@ const SignUpScreen: React.FC = () => {
 
             if (error) throw error;
 
+            showToast('Account created successfully!', 'success');
             // Navigate to home or show confirmation check logic
             // Supabase by default might require email confirmation, but usually, it logs in if auto-confirm is on.
             // We'll assume success redirects to home or shows a message.
             navigate('/home');
 
         } catch (err: any) {
-            setError(err.message || 'Failed to sign up');
+            const errorMessage = err.message || 'Failed to sign up';
+            setError(errorMessage);
+            showToast(errorMessage, 'error');
         } finally {
             setLoading(false);
         }
@@ -77,7 +82,7 @@ const SignUpScreen: React.FC = () => {
                         {...register('fullName')}
                         className={`w-full p-4 bg-gray-50 rounded-xl border ${errors.fullName ? 'border-red-300 focus:border-red-500' : 'border-gray-100 focus:border-gray-400'
                             } outline-none transition-colors text-sm`}
-                        placeholder="John Doe"
+                        placeholder="Full Name"
                     />
                     {errors.fullName && <span className="text-xs text-red-500">{errors.fullName.message}</span>}
                 </div>
@@ -89,7 +94,7 @@ const SignUpScreen: React.FC = () => {
                         {...register('email')}
                         className={`w-full p-4 bg-gray-50 rounded-xl border ${errors.email ? 'border-red-300 focus:border-red-500' : 'border-gray-100 focus:border-gray-400'
                             } outline-none transition-colors text-sm`}
-                        placeholder="hello@example.com"
+                        placeholder="your@email.com"
                     />
                     {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
                 </div>

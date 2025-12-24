@@ -27,12 +27,15 @@ const CartScreen: React.FC = () => {
             <main className="flex-1 pb-32 overflow-y-auto no-scrollbar">
                 <div className="flex flex-col gap-1 p-4">
                     {cartItems.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
                             <span className="material-symbols-outlined text-gray-300 text-6xl mb-4">shopping_basket</span>
-                            <h2 className="text-xl font-bold text-text-main">Your basket is empty</h2>
-                            <p className="text-gray-500 mt-2 mb-6">Looks like you haven't added anything yet.</p>
-                            <button onClick={() => navigate('/products')} className="px-6 py-3 bg-primary text-text-main font-bold rounded-full">
-                                Start Shopping
+                            <h2 className="text-xl font-bold text-text-main mb-2">Your cart is empty</h2>
+                            <p className="text-gray-500 mb-6 max-w-[280px]">Looks like you haven't added anything yet. Start exploring our collection!</p>
+                            <button 
+                                onClick={() => navigate('/products')} 
+                                className="px-6 py-3 bg-primary text-text-main font-bold rounded-full hover:bg-primary-dark transition-colors active:scale-95 shadow-sm"
+                            >
+                                Continue Shopping
                             </button>
                         </div>
                     ) : (

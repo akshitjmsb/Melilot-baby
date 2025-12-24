@@ -12,18 +12,24 @@ import SignUpScreen from './screens/SignUpScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import ReloadPrompt from './components/ReloadPrompt';
+import ToastContainer from './components/ToastContainer';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { SavedItemsProvider } from './context/SavedItemsContext';
+import { ToastProvider } from './context/ToastContext';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchScreen from './screens/SearchScreen';
 import AboutScreen from './screens/AboutScreen';
+import SavedItemsScreen from './screens/SavedItemsScreen';
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
+      <ToastProvider>
+        <CartProvider>
+          <SavedItemsProvider>
+            <Router>
           <div className="max-w-md mx-auto bg-white min-h-screen shadow-2xl overflow-hidden relative">
             <Routes>
               <Route path="/" element={<WelcomeScreen />} />
@@ -48,14 +54,18 @@ const App: React.FC = () => {
               <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
               <Route path="/search" element={<SearchScreen />} />
               <Route path="/about" element={<AboutScreen />} />
+              <Route path="/saved" element={<SavedItemsScreen />} />
 
               {/* Fallback routes */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
           <ReloadPrompt />
+          <ToastContainer />
         </Router>
+        </SavedItemsProvider>
       </CartProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 };

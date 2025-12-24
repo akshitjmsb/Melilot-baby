@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { Product, CartItem } from '../types';
+import { useToast } from './ToastContext';
 
 interface CartContextType {
     cartItems: CartItem[];
@@ -14,6 +15,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { showToast } = useToast();
     const [cartItems, setCartItems] = useState<CartItem[]>(() => {
         try {
             const saved = localStorage.getItem('cart');
@@ -46,10 +48,11 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (existing) {
                 // Check stock before incrementing
                 if (existing.quantity + 1 > (existing.maxStock || maxStock)) {
-                    // Ideally show a toast here, but simple return for now
+                    showToast('Maximum stock reached for this item', 'error');
                     return prev;
                 }
 
+                showToast('Item quantity updated', 'success');
                 return prev.map(item =>
                     item.id === product.id && item.size === size
                         ? { ...item, quantity: item.quantity + 1 }
@@ -57,6 +60,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 );
             }
 
+            showToast('Added to cart ✓', 'success');
             return [...prev, {
                 ...product,
                 quantity: 1,
@@ -69,6 +73,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const removeFromCart = (id: string, size: string) => {
         setCartItems(prev => prev.filter(item => !(item.id === id && item.size === size)));
+        showToast('Item removed from cart', 'info');
     };
 
     const updateQuantity = (id: string, size: string, delta: number) => {

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const loginSchema = z.object({
     email: z.string().email('Invalid email address'),
@@ -17,6 +18,7 @@ const LoginScreen: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth(); // Check if already logged in?
+    const { showToast } = useToast();
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -42,9 +44,12 @@ const LoginScreen: React.FC = () => {
 
             if (error) throw error;
 
+            showToast('Signed in successfully!', 'success');
             navigate(from, { replace: true });
         } catch (err: any) {
-            setError(err.message || 'Failed to sign in');
+            const errorMessage = err.message || 'Failed to sign in';
+            setError(errorMessage);
+            showToast(errorMessage, 'error');
         } finally {
             setLoading(false);
         }
@@ -73,7 +78,7 @@ const LoginScreen: React.FC = () => {
                         {...register('email')}
                         className={`w-full p-4 bg-gray-50 rounded-xl border ${errors.email ? 'border-red-300 focus:border-red-500' : 'border-gray-100 focus:border-gray-400'
                             } outline-none transition-colors text-sm`}
-                        placeholder="hello@example.com"
+                        placeholder="your@email.com"
                     />
                     {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
                 </div>
